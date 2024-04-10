@@ -15,7 +15,7 @@ This Trivia Game Server is a part of a client-server application designed to hos
 * Understanding of TCP/UDP networking concepts.
 ### Installation
 1. Clone the repository:
-   *git clone https://your-repository-url.git*
+   *git clone [https://your-repository-url.git](https://github.com/AyeletHashahar/Server-Client-trivia-contest-game/tree/main)*
    
 2. Navigate to the project directory:
    *cd trivia-game-server*
@@ -32,4 +32,4 @@ Clients must be designed to listen for the server's UDP broadcasts, connect via 
 * Ayelet Hashahar Cohen - www.linkedin.com/in/ayelet-hashahar-cohen
 * Tzuf lahan - www.linkedin.com/in/tzuf-lahan-962b76233
 
-Project Link: https://github.com/your_username/trivia-game-server
+Project Link: https://github.com/AyeletHashahar/Server-Client-trivia-contest-game/tree/main
