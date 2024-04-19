@@ -1,3 +1,4 @@
+import errno
 import socket
 import random
 import threading
@@ -97,6 +98,7 @@ class Player:
             self.game_loop()
         except Exception as e:
             print(f"{self.ANSI_RED}Error connecting to server: {e}{self.ANSI_RESET}")
+            self.reconnect_to_server()
         finally:
             self.stop_game.set()
             self.tcp_socket.close()
@@ -104,27 +106,30 @@ class Player:
 
     def game_loop(self):
         """Handle the game interactions over a TCP connection."""
-        # stop_game = threading.Event()
+        global input_allowed  # Use global variable for the input flag
+        input_allowed = False  # Flag to control when input is allowed
 
         def user_input_thread():
+            global input_allowed
             while not self.stop_game.is_set():
-                try:
-                    response = input()
-                    if response.upper() in ['Y', 'T', '1']:
-                        response = 'Y'
-                    elif response.upper() in ['N', 'F', '0']:
-                        response = 'N'
-                    else:
-                        print(f"{self.ANSI_RED}Invalid input. Please answer with Y/T/1 for True or N/F/0 for False..{self.ANSI_RESET}")
-                        continue
-                    print(f"{self.ANSI_BLUE}Your answer is: {response}.{self.ANSI_RESET}")
-                    self.tcp_socket.sendall(response.encode())
+                if input_allowed:
+                    try:
+                        response = input()
+                        if response.upper() in ['Y', 'T', '1']:
+                            response = 'Y'
+                        elif response.upper() in ['N', 'F', '0']:
+                            response = 'N'
+                        else:
+                            print(f"{self.ANSI_RED}Invalid input. Please answer with Y/T/1 for True or N/F/0 for False..{self.ANSI_RESET}")
+                            continue
+                        print(f"{self.ANSI_BLUE}Your answer is: {response}{self.ANSI_RESET}")
+                        self.tcp_socket.sendall(response.encode())
 
-                except Exception as e:
-                    if self.stop_game.is_set():
-                        break  # If game over, exit the thread
+                    except Exception as e:
+                        if self.stop_game.is_set():
+                            break  # If game over, exit the thread
 
-        # Start the input thread
+        # Start the input thread but do not allow input yet
         input_thread = threading.Thread(target=user_input_thread)
         input_thread.start()
 
@@ -135,27 +140,53 @@ class Player:
                     message = self.tcp_socket.recv(self.BUFFER_SIZE).decode().strip()
 
                     if message:
-                        if "Server disconnected, listening for offer requests..." in message:
+                        if '1' in message:
+                            input_allowed = True  # Enable input when "1" is received
+                        if ("Server disconnected, listening for offer requests..."  or "Resetting game") in message:
                             self.stop_game.set()
                             break
-                        if "disconnected from the game" in message:
-                            print(f"{self.ANSI_RED}{message}{self.ANSI_RESET}")
-                        else:
-                            print(f"{self.ANSI_MAGENTA}{message}{self.ANSI_RESET}")
-                            if "You are disqualified" in message:
-                                continue
-                            if "Game over" in message or "You win" in message:
-                                self.stop_game.set()
-                                print(f"{self.ANSI_YELLOW}Server disconnected, listening for offer requests....{self.ANSI_RESET}")
-                                break
-        except:
-            print(f"{self.ANSI_RED}The server disconnected{self.ANSI_RESET}")
-            self.tcp_socket.close()
-            self.listen_for_offers()
 
+                        print(f"{self.ANSI_MAGENTA}{message}{self.ANSI_RESET}")
+                        if "You are disqualified" in message:
+                            continue
+                        if "Game over" in message or "You win" in message:
+                            self.stop_game.set()
+                            print(f"{self.ANSI_YELLOW}Server disconnected, listening for offer requests....{self.ANSI_RESET}")
+                            break
+        except Exception as e:
+            print(f"{self.ANSI_RED}Error during game: {e}.{self.ANSI_RESET}")
+            if isinstance(e, socket.error) and e.errno in [errno.ECONNRESET, errno.ECONNABORTED, errno.EPIPE]:
+                self.reconnect_to_server()
         finally:
             self.stop_game.set()  # Signal input thread to stop
             input_thread.join(timeout=1)  # Use a timeout to avoid being stuck here
+
+    def reconnect_to_server(self):
+        print(f"{self.ANSI_YELLOW}Attempting to reconnect to the server...{self.ANSI_RESET}")
+
+        for attempt in range(3):  # Try to reconnect 3 times
+            try:
+                # Close the previous socket if it's open
+                if self.tcp_socket is not None:
+                    self.tcp_socket.close()
+                # Re-initialize socket
+                self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.tcp_socket.connect((self.server_ip, self.server_port))
+                print(f"{self.ANSI_GREEN}Reconnected to the server on attempt {attempt + 1}.{self.ANSI_RESET}")
+                self.tcp_socket.sendall((self.player_name + '\n').encode())
+                print(f"{self.ANSI_BLUE}you are player {self.player_name}, good luck:){self.ANSI_RESET}")
+                self.game_loop()  # Resume the game loop
+                return  # Exit the function upon successful reconnection
+            except socket.error as e:
+                print(f"{self.ANSI_RED}Reconnection attempt {attempt + 1} failed: {e}{self.ANSI_RESET}")
+                time.sleep(3)  # Wait for 3 seconds before retrying
+
+        # If reconnection failed after 3 attempts, handle accordingly
+        print(f"{self.ANSI_RED}Failed to reconnect after 3 attempts.{self.ANSI_RESET}")
+        # Close the socket and clean up before listening for offers again
+        if self.tcp_socket is not None:
+            self.tcp_socket.close()
+        self.listen_for_offers()  # Go back to listening for new offers
 
     def run(self):
         """Run the main loop to continuously listen for offers."""
@@ -164,3 +195,7 @@ class Player:
             time.sleep(1)  # Delay to allow socket closure and cleanup
 
 
+# Create and start the client
+if __name__ == '__main__':
+    client = Player()
+    client.run()
