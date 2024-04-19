@@ -1,8 +1,7 @@
 import socket
 import struct
-import sys
 import time
-from threading import Thread, Lock
+from threading import Lock
 import threading
 import random
 from Statistic import GameStatistics
@@ -91,14 +90,10 @@ class Server:
 
     def countdown(self):
         for i in reversed(range(1, 6)):  # Countdown from 5 to 1
+            time.sleep(0.5)
             print(f"{self.ANSI_GREEN}{i}{self.ANSI_RESET}")
-            for client in self.clients:
-                try:
-                    client['socket'].send(str(i).encode())
-                except Exception as e:
-                    print(f"{self.ANSI_RED}Failed to send to {client['name']}: {e}{self.ANSI_RESET}")
-                    self.remove_client(client['socket'], client['name'])
-            time.sleep(1)
+            self.sent_to_clients(i)
+            time.sleep(0.5)
 
     def is_port_in_use(self, port):
         """
@@ -127,6 +122,13 @@ class Server:
             except Exception as e:
                 print(f"{self.ANSI_RED}Error broadcasting UDP offer: {e}{self.ANSI_RESET}")
 
+    def sent_to_clients(self, message):
+        for client in self.clients:
+            try:
+                client['socket'].send(str(message).encode())
+            except Exception as e:
+                print(f"{self.ANSI_RED}Failed to send to {client['name']}: {e}{self.ANSI_RESET}")
+
     def handle_client(self, client_socket, addr):
         player_name = client_socket.recv(1024).decode().strip()
         print(f"{self.ANSI_GREEN}player {player_name} connected from {addr}{self.ANSI_RESET}")
@@ -141,7 +143,6 @@ class Server:
                 answer = client_socket.recv(1024).decode().strip()
                 print(f"{self.ANSI_MAGENTA}player {player_name} answered with {answer}{self.ANSI_RESET}")
 
-
                 if player_name in self.disqualified_players:
                     continue  # Skip processing if player is already disqualified
 
@@ -153,34 +154,13 @@ class Server:
                 else:
                     self.disqualify_player(client_socket, player_name)
                     if len(self.disqualified_players) == len(self.clients):
-                        message = "All the players was wrong:(, sending a new question:\n"
-                        print(f"{self.ANSI_RED}{message}{self.ANSI_RESET}")
-                        for client in self.clients:
-                            try:
-                                client['socket'].send(message.encode())
-                            except Exception as e:
-                                print(f"{self.ANSI_RED}Failed to send to {client['name']}: {e}{self.ANSI_RESET}")
-                                self.remove_client(client['socket'], client['name'])
                         self.disqualified_players.clear()
                         self.start_game()
                     continue
-            except:
-                client_socket.close()
-                self.remove_client(client_socket, player_name)
-                self.broadcasting = True
-                self.game_active = False
-                self.flag_new_game = True
-                message = f'player {player_name} has been disconnected from the game, Starting a new Game :)'
-                print(f'{self.ANSI_MAGENTA}{message}{self.ANSI_RESET}')
-                for client in self.clients:
-                    try:
-                        client['socket'].send(message.encode())
-                    except Exception as e:
-                        print(f"{self.ANSI_RED}Failed to send to {client['name']}: {e}{self.ANSI_RESET}")
-                        self.remove_client(client['socket'], client['name'])
-
-                threading.Thread(target=self.broadcast_udp_offers).start()
-                self.accept_tcp_connections()
+            except Exception as e:
+                print(f"{self.ANSI_RED}Error receiving data from {addr}: {e}{self.ANSI_RESET}")
+                # self.remove_client(client_socket, player_name)
+                break
         # Save the stats after handling each client
         self.stats.save_stats()
 
@@ -199,13 +179,7 @@ class Server:
 
         stats_summary = self.stats.get_summary(current_game_player_names)
         summary_message_with_stats = summary_message + "\n\n" + stats_summary
-
-        for client in self.clients:
-            try:
-                client['socket'].send(summary_message_with_stats.encode())
-            except Exception as e:
-                print(f"{self.ANSI_RED}Failed to send to {client['name']}: {e}{self.ANSI_RESET}")
-                self.remove_client(client['socket'], client['name'])
+        self.sent_to_clients(summary_message_with_stats)
         print(f"{self.ANSI_MAGENTA}{summary_message_with_stats}{self.ANSI_RESET}")
         self.reset_game()
 
@@ -232,12 +206,7 @@ class Server:
         if len(self.clients) < 2:
             message = "Not enough players to start the game. Waiting for more players..."
             print(f"{self.ANSI_BLUE}{message}{self.ANSI_RESET}")
-            for client in self.clients:
-                try:
-                    client['socket'].send(message.encode())
-                except Exception as e:
-                    print(f"{self.ANSI_RED}Failed to send to {client['name']}: {e}{self.ANSI_RESET}")
-                    self.remove_client(client['socket'], client['name'])
+            self.sent_to_clients(message)
             self.start_or_restart_timer()
             return
 
@@ -251,24 +220,14 @@ class Server:
                 message += f"Player: {client['name']}\n"
             message += "get ready we start in 5 second:"
             print(f"{self.ANSI_GREEN}{message}{self.ANSI_RESET}")
-            for client in self.clients:
-                try:
-                    client['socket'].send(message.encode())
-                except Exception as e:
-                    print(f"{self.ANSI_RED}Failed to send to {client['name']}: {e}{self.ANSI_RESET}")
-                    self.remove_client(client['socket'], client['name'])
+            self.sent_to_clients(message)
             message = ""
             self.countdown()
             self.flag_new_game = False
         else:
-            message = f"Time up, sending a new question:\n"
+            message = f"Time up or All the players was wrong:(, sending a new question:\n"
         message += "==\n" + self.current_question["question"]
-        for client in self.clients:
-            try:
-                client['socket'].send(message.encode())
-            except Exception as e:
-                print(f"{self.ANSI_RED}Failed to send to {client['name']}: {e}{self.ANSI_RESET}")
-                self.remove_client(client['socket'], client['name'])
+        self.sent_to_clients(message)
         print(f"{self.ANSI_MAGENTA}{message}{self.ANSI_RESET}")
         self.start_or_restart_timer()
 
@@ -278,21 +237,19 @@ class Server:
         for client in self.clients:
             try:
                 # Send a disconnection message before closing the socket
-                disconnection_message = "Server disconnected, listening for offer requests..."
-                client['socket'].send(disconnection_message.encode())
+                # disconnection_message = "Server disconnected, listening for offer requests..."
+                # client['socket'].send(disconnection_message.encode())
                 client['socket'].close()
             except Exception as e:
                 print(f"{self.ANSI_RED}Error closing connection for {client['name']}: {e}{self.ANSI_RESET}")
                 self.remove_client(client['socket'], client['name'])
-        # self.cleanup_resources()
-        # self.reinitialize_components()
+
         self.clients.clear()
         self.disqualified_players.clear()
         self.broadcasting = True
         self.game_active = False
         self.flag_new_game = True
         self.run()
-
 
     def run(self):
         print(f"{self.ANSI_YELLOW}Server started, listening on IP address {self.server_ip}{self.ANSI_RESET}")
