@@ -1,4 +1,4 @@
-# Trivia Game Server
+# Server - Client Trivia Game
 ## Project Overview
 This Trivia Game Server is a part of a client-server application designed to host trivia games. It manages player connections, broadcasts trivia questions, evaluates answers, and determines game outcomes based on player responses. The server uses UDP for broadcasting its presence to potential clients and TCP for handling game logic and player interactions.
 
