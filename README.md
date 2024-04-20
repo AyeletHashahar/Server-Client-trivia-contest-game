@@ -1,6 +1,7 @@
 # Client - Server Trivia Game
 ## Project Overview
 This Trivia Game Server is a part of a client-server application designed to host trivia games. It manages player connections, broadcasts trivia questions, evaluates answers, and determines game outcomes based on player responses. The server uses UDP for broadcasting its presence to potential clients and TCP for handling game logic and player interactions.
+The implementation of this project has written with python and can be run only locally on the same network. 
 
 ## Features
 * **UDP Broadcasting:** The server broadcasts its presence to the network, allowing clients to discover and connect to it.
