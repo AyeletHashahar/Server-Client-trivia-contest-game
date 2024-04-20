@@ -4,7 +4,8 @@ This Trivia Game Server is a part of a client-server application designed to hos
 The implementation of this project has written with python and can be run only locally on the same network.
 
 ## The Server screen:
-![image](https://github.com/AyeletHashahar/Server-Client-trivia-contest-game/assets/167331530/bc8c7b9f-cf05-4cf6-96f7-9b3b34760423)
+![image](https://github.com/AyeletHashahar/Server-Client-trivia-contest-game/assets/167331530/c095a18d-3d27-4bf1-9a85-7f5f54bc9726)
+
 
 ## The Client screen:
 ![image](https://github.com/AyeletHashahar/Server-Client-trivia-contest-game/assets/167331530/bc25448b-bfc7-4457-aa8c-9044e78bdf38)
