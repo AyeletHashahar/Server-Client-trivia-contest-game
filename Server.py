@@ -117,14 +117,14 @@ class Server:
 
 
 
-    def find_free_port(self, start=49000, end=65500):
+     def find_free_port(self, start=49000, end=65500):
         """
         Find a free port we can use.
         """
-        for port in range(start, end + 1):
-            if not self.is_port_in_use(port):
-                return port
-        raise IOError("No free port found.")
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((self.server_ip, 0))
+            return s.getsockname()[1]
+
 
 
 
