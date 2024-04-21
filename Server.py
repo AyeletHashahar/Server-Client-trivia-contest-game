@@ -117,7 +117,7 @@ class Server:
 
 
 
-     def find_free_port(self, start=49000, end=65500):
+    def find_free_port(self, start=49000, end=65500):
         """
         Find a free port we can use.
         """
